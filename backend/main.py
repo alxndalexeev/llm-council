@@ -14,14 +14,27 @@ from .council import run_full_council, generate_conversation_title, stage1_colle
 
 app = FastAPI(title="LLM Council API")
 
-# Enable CORS for local development
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:3000"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# Enable CORS - allow all origins in production, localhost for development
+import os
+cors_origins = os.getenv("CORS_ORIGINS", "*").split(",") if os.getenv("CORS_ORIGINS") else ["*"]
+if cors_origins == ["*"]:
+    # Allow all origins
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=False,  # Must be False when allow_origins=["*"]
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+else:
+    # Specific origins
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=cors_origins,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
 
 class CreateConversationRequest(BaseModel):
