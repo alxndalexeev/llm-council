@@ -8,11 +8,13 @@ from typing import List, Dict, Any
 import uuid
 import json
 import asyncio
+import logging
 
 from . import storage
 from .council import run_full_council, generate_conversation_title, stage1_collect_responses, stage2_collect_rankings, stage3_synthesize_final, calculate_aggregate_rankings
 
 app = FastAPI(title="LLM Council API")
+logger = logging.getLogger("llm_council")
 
 # Enable CORS - allow all origins in production, localhost for development
 import os
@@ -35,6 +37,30 @@ else:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+
+@app.on_event("startup")
+async def _startup_self_probe():
+    """
+    Railway diagnostics: from inside the container, probe the server via localhost.
+    If this succeeds but Railway still returns 502, the issue is almost certainly
+    service networking/port config rather than the app process.
+    """
+    port = int(os.getenv("PORT", "8000"))
+
+    async def _probe():
+        await asyncio.sleep(2.0)
+        url = f"http://127.0.0.1:{port}/"
+        try:
+            import httpx
+
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                resp = await client.get(url)
+            logger.info("startup self-probe ok: %s -> %s", url, resp.status_code)
+        except Exception:
+            logger.exception("startup self-probe failed: %s", url)
+
+    asyncio.create_task(_probe())
 
 
 class CreateConversationRequest(BaseModel):
